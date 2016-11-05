@@ -1,0 +1,85 @@
+#!/bin/bash
+service iptables stop
+setenforce 0
+
+read -p "input your ip:"  IP
+echo $IP > /tmp/ip
+awk -F\. -v OFS='.' '{print $3,$2,$1}' >> /tmp/ip2 /tmp/ip
+ZIP=`cat /tmp/ip2`
+awk -F\. -v OFS='.' '{print $4}' >> /tmp/ip3 /tmp/ip
+LIP=`cat /tmp/ip3`
+NET=/etc/sysconfig/network-scripts/ifcfg-eth0
+sed -i 's/ONBOOT=no/ONBOOT=yes/g' $NET 
+sed -i 's/BOOTPROTO=dhcp/BOOTPROTO=static/g' $NET
+echo "IPADDR=$IP"  >> $NET
+echo "NETMASK=$IP"  >> $NET
+echo "DNS=$IP"   >> $NET
+service network restart
+mount /dev/cdrom /mnt
+mv /etc/yum.repos.d/*  /tmp
+cd /etc/yum.repos.d/
+touch cetos_test.repo
+echo "[centos]" >>  cetos_test.repo
+echo "name=centos6.4"  >>  cetos_test.repo
+echo "baseurl=file:///mnt"  >>  cetos_test.repo
+echo "enabled=1"  >>  cetos_test.repo
+echo "gpgcheck=0"  >>  cetos_test.repo
+yum clean all  &> /dev/null
+yum makecache  &> /dev/null
+cd /mnt/Packages
+rpm -e bind --nodeps
+yum -y install bind
+sed  -i 's/127.0.0.1/any/g' /etc/named.conf
+sed  -i 's/localhost/any/g' /etc/named.conf
+read -p "please input the zone you want to resolve(likes:liukang.com): " ZONE
+ZCONF=/etc/named.rfc1912.zones
+echo "zone \"$ZONE\" IN {
+	type master;
+	file \"$ZONE.zone\";
+};"  >>  $ZCONF 
+#read -p "please input the IP of the zone(likes:1.168.192): "  ZIP
+echo "zone \"$ZIP.in-addr.arpa\" IN {
+	type master;
+	file \"$ZIP.in-addr.arpa.zone\";
+};"   >> $ZCONF
+cd  /var/named/
+touch $ZONE.zone  &> /dev/null
+echo "\$TTL 86400
+@	IN	SOA	ns.$ZONE.	root (
+	01
+	1D
+	1D
+	1D
+	1D)
+
+	IN	NS	ns.$ZONE.
+	IN	MX  10  mail.$ZONE.
+ns	IN	A	$IP
+www	IN	A	$IP
+ftp	IN	A	$IP
+mail 	IN 	A	$IP
+"   >> $ZONE.zone
+
+touch  $ZIP.in-addr.arpa.zone &> /dev/null
+echo "\$TTL 86400
+@	IN	SOA	ns.$ZONE.	root (
+	01
+	1D
+	1D
+	1D
+	1D)
+
+	IN	NS	ns.$ZONE.
+	IN	MX  10  mail.$ZONE.
+	
+$LIP	IN	PTR	ns.$ZONE.
+$LIP	IN	PTR	www.$ZONE.
+$LIP	IN	PTR	ftp.$ZONE.
+$LIP	IN	PTR	mali.$ZONE.
+"   >> $ZIP.in-addr.arpa.zone
+chown .named $ZIP.in-addr.arpa.zone
+chown .named  $ZONE.zone
+rm -rf /tmp/ip* 
+service named start  &> /dev/null
+LOOK=`netstat -tnlp | grep named`
+echo $LOOK
