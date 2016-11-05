@@ -1,0 +1,256 @@
+Docker虚拟化有三个概念需要理解，分别镜像、容器、仓库。
+1)	镜像：docker的镜像其实就是模板，跟我们常见的ISO镜像类似，是一个样板。
+2)	容器：使用镜像常见的应用或者系统，我们称之为一个容器。
+3)	仓库：仓库是存放镜像的地方，分为公开仓库（Public）和私有仓库（Private）两种形式。
+2.	Docker虚拟化特点
+跟传统VM比较具有如下优点：
+1)	操作启动快
+运行时的性能可以获取极大提升，管理操作（启动，停止，开始，重启等等） 都是以秒或毫秒为单位的。
+2)	轻量级虚拟化
+你会拥有足够的“操作系统”，仅需添加或减小镜像即可。在一台服务器上可以布署100~1000个Containers容器。但是传统虚拟化，你虚拟10-20个虚拟机就不错了。
+3)	开源免费
+开源的，免费的，低成本的。由现代Linux内核支持并驱动。注* 轻量的Container必定可以在一个物理机上开启更多“容器”，注定比VMs要便宜。
+4)	前景及云支持
+正在越来越受欢迎，包括各大主流公司都在推动docker的快速发展，性能有很大的优势。
+跟传统VM比较具有如下缺点：
+1)	目前知道的人比较少
+2)	相关的技术资料欠缺
+3)	Go语言还没完全成熟
+3.	Docker安装配置
+####################################################################################
+一、镜像
+
+镜像是docker运行的前提。
+docker  pull   imagesname  比如获取Ubuntu镜像：    docker pull  Ubuntu  默认最新的
+也可以先使用 docker search  Ubuntu    然后在按照自己想要的去pull。
+
+查看镜像信息：
+   docker  images 
+docker  images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+ubuntu              latest              c73a085dc378        2 weeks ago         127 MB
+nginx               latest              ba6bed934df2        2 weeks ago         181.3 MB
+centos              latest              980e0e4c79ec        4 weeks ago         196.7 MB
+hello-world         latest              c54a2cc56cbb        3 months ago        1.848 kB
+
+REPOSITORY ：来自于哪个仓库，比如 ubuntu
+
+TAG：镜像的标记TAG 信息用来标记来自同一个仓库的不同镜像。例如 ubuntu 仓库中有多个镜像，
+通过 TAG 信息来区分发行版本，
+
+IMAGE ID  ： 镜像ID（唯一）
+
+CREATED：  镜像创建时间
+
+SIZE：  镜像大小
+
+
+运行镜像
+   docker  run  -d   --name   fisrt_docker    -ti  ubuntu  /bin/bash
+   -d 		: 后台运行，不退出
+   --name   ： 起一个名字
+   -t 		： 启动一个虚拟终端
+   -i       ： 是容器处于打开状态
+
+查看容器信息：
+docker ps  -a
+
+查看镜像信息：
+docker   inspect   c73a   （ID可以不用全部复制，）  
+
+删除镜像：
+docker  rmi IMAGE   （IMAGE可以为标签，也可以为ID）
+同一个ID,不同标签的删除ID不会吧镜像删除，除非是最后一个。
+
+删除镜像的时候若是有容器在使用则删除不了。可以使用 -f 参数  # docker  rmi  -f  IMAGE  不建议这么做，会有遗留问题。
+
+打标签
+便于认清哪个容器是做什么的。
+docker  tag  
+
+docker  tag  766675a9f256  shenmin/v1
+
+docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED              SIZE
+first/liukang       v1                  766675a9f256        About a minute ago   321.8 MB
+shenmin/v1          latest              766675a9f256        About a minute ago   321.8 MB
+
+
+清理所有未打过标签的本地镜像
+docker images 可以列出本地所有的镜像，其中很可能会包含有很多中间状态的
+未打过标签的镜像，大量占据着磁盘空间。
+使用下面的命令可以清理所有未打过标签的本地镜像
+$ sudo docker rmi $(docker images -q -f "dangling=true")
+其中 -q 和 -f 是缩写, 完整的命令其实可以写成下面这样，
+$ sudo docker rmi $(docker images --quiet --filter "dangling=tru
+e")
+
+
+
+创建镜像
+
+三种方法：
+    基于已有的镜像创建，   基于本地模板创建，基于dockerfile创建
+
+ 基于已有的镜像：
+     命令格式 ：  docker commit [options] CONTAINER   [REPOSITRY[:TAG]]
+          -a  , --author=""作者信息
+          -m，--message=""提交的信息
+          -p,--pause=true 提交时暂停容器
+
+    docker  exec  -ti  ed6  /bin/bash    #进入一个启动的容器
+ 	touch  test.txt       				# 进行修改
+    exit  #记住此时的ID
+    docker commit  -m 'Add a file'  -a "liukang"  ed6910119aa4 test
+    docker images   查看
+	
+	REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+	test                latest              e31d24fa7a8a        10 seconds ago      181.3 MB
+	ubuntu              latest              c73a085dc378        2 weeks ago         127 MB
+	nginx               latest              ba6bed934df2        2 weeks ago         181.3 MB
+	centos              latest              980e0e4c79ec        4 weeks ago         196.7 MB
+	hello-world         latest              c54a2cc56cbb        3 months ago        1.848 kB
+
+
+  基于本地模板创建
+  		下载一个Ubuntu14.04的模板压缩包，
+  		cat ubuntu-14.04*.tat.gz   |  docker import  - ubuuntu14.04
+
+  基于dockerfile创建
+      使用	docker	commit	来扩展一个镜像比较简单，但是不方便在一个团队中分 享。
+      我们可以使用 docker 	build	来创建一个新的镜像。为此，首先需要创建一 
+      个Dockerfile，包含一些如何创建镜像的指令。
+	mkdir docker  
+	vim Dockerfile
+	    #	This	is	a	comment 
+	    FROM	ubuntu:14.04 
+	    MAINTAINER	Docker	Newbee	<newbee@docker.com> 
+	    RUN	apt-get	-qq	update 
+	    RUN	apt-get	-qqy	install	ruby	ruby-dev 
+	    RUN	gem	install	docker 
+
+	    #Dockerfile	基本的语法是
+		使用	#	来注释	
+		FROM		指令告诉	Docker	使用哪个镜像作为基础 
+		接着是维护者的信息	
+		RUN	开头的指令会在创建中运行，比如安装一个软件包，在这里使用	apt-get 来安装了一些软件
+
+     使用docker  build 
+         docker build   -t='liukang/first_dockerfile:v1'   /root/docker/
+           -t  :  做一个标记
+            /root/docker/ ： dockerfile在哪一个目录里。
+它要做的第一件事情就是上传这个	Dockerfile	内 容，
+因为所有的操作都要依据	Dockerfile	来进行。	
+然后，Dockfile	中的指令被一条 一条的执行。
+每一步都创建了一个新的容器，在容器中执行指令并提交修改（就跟 之前介绍过的		docker	commit		一样）。
+当所有的指令都执行完毕之后，返回了 最终的镜像	id。
+所有的中间步骤所产生的容器都被删除和清理了。
+*注意一个镜像不能超过	127	层
+
+
+此外，还可以利用		ADD		命令复制本地文件到镜像；
+用		EXPOSE	命令来向外部开 放端口；
+用		CMD		命令来描述容器启动后运行的程序等。例如
+#	put	my	local	web	site	in	myApp	folder	to	/var/www 
+ADD	myApp	/var/www 
+#	expose	httpd	port 
+EXPOSE	80 
+#	the	command	to	run 
+CMD	["/usr/sbin/apachectl",	"-D",	"FOREGROUND"]
+
+
+存出和载入镜像：
+     存出：
+     	docker  save  -o   centos.tar   980e0e4c79ec
+     载入：从存出的本地文件再导入到本地镜像库，
+     	docker  load  --input  centos.tar
+     	或者:  docker  load  <  centos.tar
+
+
+
+容器
+容器是 Docker 又一核心概念。
+简单的说，容器是独立运行的一个或一组应用，以及它们的运行态环境。对应的，
+虚拟机可以理解为模拟运行的一整套操作系统（ 提供了运行态环境和其他系统环
+境） 和跑在上面的应用。
+
+查看容器信息：
+  docker   logs ID
+
+新建容器：
+   docker  create
+   但是创建的是处在停止状态。可以使用docker  start来启动。
+
+新建并启动：
+   docker run  ubuntu  /bin/echo heheh
+   启动输出 heheh  立即停止
+
+ docker ps  -a
+CONTAINER ID        IMAGE               COMMAND                   CREATED             STATUS                      PORTS                           NAMES
+f9ee550b818d        ubuntu              "/bin/echo heheh"         34 seconds ago      Exited (0) 34 seconds ago                                   naughty_curie
+
+
+当利用 docker run 来创建容器时，Docker 在后台运行的标准操作包括：
+
+检查本地是否存在指定的镜像，不存在就从公有仓库下载
+利用镜像创建并启动一个容器
+分配一个文件系统，并在只读的镜像层外面挂载一层可读写层
+从宿主主机配置的网桥接口中桥接一个虚拟接口到容器中去
+从地址池配置一个 ip 地址给容器
+执行用户指定的应用程序
+执行完毕后容器被终止
+
+启动一个bash终端进入，但是exit退出，此容器就停止了。
+docker  run  -it  centos   /bin/bash
+
+
+守护状态运行：
+docker  run -d  centos  -it    /bin/bash
+
+停止/启动  
+docker  stop   IMAGE/ID
+docker start IMAGE/ID
+
+进入容器
+
+三种方法  docker attach  、 docker exec、nsenter
+
+docker attach  ID  ##不推荐，容易卡住。
+
+docker  exec  -it  ID   /bin/bash # 很是方便
+
+nsenter:
+    可能需要安装 util-linux   yum  -y install   util-linux
+    需要查找容器的ID ：  docker inspect  -f  '{{.Sate.Pid}}'  ID/IMAGE
+    		链接	    ： nsenter  --target  PID  --mount  --uts  --net  --pid
+
+
+
+删除容器：
+  docker  rm     
+       -f  	强制删除
+       -l   删除容器的链接，但是保留容器
+       -v   删除容器所挂载的容器卷
+
+		清理所有处于终止状态的容器
+
+    终止容器  docker  stop   $(docker ps -a  -q)
+		用 docker ps -a 命令可以查看所有已经创建的包括终止状态的容器，用 docker rm $(docker ps -a -q) 可以全
+		部清理掉。
+		*注意：这个命令其实会试图删除所有的包括还在运行中的容器，不过就像上面提过
+		的 docker rm 默认并不会删除运行中的容器。
+
+
+导入导出容器：
+   
+   导出容器到文件，不管是否在运行。可以使用docker  export ，在导入的话实现了容器的迁移。
+   			docker export f79   >  docker_test_centos.tar
+
+   导入容器从文件，使其成为镜像，
+      cat docker_test_centos.tar |  docker --import  -  test/hehe:v1.0
+
+      docker --import 与 docker load的区别：
+      		docker --import  导入的是一个容器快照到本地镜像库。容器快照文件丢弃所有的历史记录和元数据信息，（仅是当前的状态）体积小
+      						 容器快照文件导入是可以重新指定标签等元数据信息。
+      		docker load  是导入一个镜像存储文件到本地的镜像库。保存完整的记录，体积大。
+ 
